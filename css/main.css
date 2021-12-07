@@ -1,53 +1,66 @@
 :root {
---border-radius: 20px;
---main-theme: #00A9A5;
---alt-theme: #0B5351;
---main-accent: #90C2E7;
---alt-accent: #4E8098;
---main-black: #092327;
---main-white: #eeeeee;
+  --border-radius: 20px;
+  --main-theme: #00a9a5;
+  --alt-theme: #0b5351;
+  --main-black: #092327;
+  --main-white: #eeeeee;
+  --highlight: #025857;
 }
 
 body {
-display: flex;
-flex-direction: column;
-align-items: center;
-justify-content: center;
-text-align: center;
-background-color: var(--main-black);
-color: var(--main-white);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  background-color: var(--main-black);
+  color: var(--main-white);
 }
 
 h1 {
-font-family: 'Righteous', cursive;
-font-size: 120px;
-line-height: 1;
-background-color: var(--main-theme);
-padding: 20px;
-border-radius: var(--border-radius) 0 var(--border-radius) 0;
-box-shadow: 15px 15px 0px var(--main-black);
-margin: 0 auto;
-margin-top:10px;
+  font-family: "Righteous", sans-serif;
+  font-size: 120px;
+  line-height: 1;
+  background-color: var(--main-theme);
+  padding: 20px;
+  border-radius: var(--border-radius) 0 var(--border-radius) 0;
+  box-shadow: 15px 15px 0px var(--main-black);
+  margin: 0 auto;
+  margin-top: 10px;
 }
 
 h3 {
-margin-top: 30px;
-font-family: 'Viga', sans-serif;
-font-size: 20px;
+  margin-top: 30px;
+  font-family: "Viga", sans-serif;
+  font-size: 20px;
 }
 
 #gameCanvas {
-position: block;
-z-index: 0;
-background-color: var(--alt-accent);
-
-border-radius: var(--border-radius);
-
+  position: block;
+  z-index: 0;
+  background-color: var(--main-theme);
+  border-radius: var(--border-radius);
+  cursor: crosshair;
 }
 
 #game-holder {
-    background-color: var(--main-accent);
+  background-color: var(--main-theme);
+  padding: 20px;
+  border-radius: var(--border-radius);
+}
 
-    padding: 20px;
-border-radius: var(--border-radius);
+.highlight {
+  animation: highlight-animation 2s 4 ease-in-out;
+}
+
+@keyframes highlight-animation {
+  0% {
+    color: var(--main-white);
+  }
+  50% {
+    color: var(--highlight);
+  }
+  100% {
+    color: var(--main-white);
+  }
 }

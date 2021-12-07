@@ -1,13 +1,39 @@
 const gameCanvas = document.getElementById('gameCanvas');
 const arrowGridSize = 10;
 
-const CANVAS_WIDTH = 800;
+const CANVAS_WIDTH = 1200;
 const CANVAS_HEIGHT = 600;
 
+const CANVAS_GAME_SIZE = 600;
+const CANVAS_X_OFFSET = (CANVAS_WIDTH - CANVAS_GAME_SIZE) / 2;
+const CANVAS_Y_OFFSET = (CANVAS_HEIGHT - CANVAS_GAME_SIZE) / 2;
+
+var started_game = false;
 var player_done = false;
+var has_answered = false;
 var remainingLocations = [];
+var override_equation = {
+    i: "sin(x)",
+    j: "-x",
+}
+
+var equation;
+var max_magnitude;
+var override_equation = false;
+
+const colors = {
+    'black': '#092327',
+    'white': '#eeeeee',
+    'theme': '#00A9A5',
+    'alt_theme': '#0B5351',
+    'highlight': '#dac0f8',
+    'background': '#0e0e0e',
+};
+
+
 /* 
 Game loop:
+0: Display UI
 1: Generate vector field equation
 2: Display equation, and pause for 5 seconds
 3: Slowly & randomly generate arrows
@@ -16,16 +42,26 @@ Game loop:
 6: Start over!
 */
 async function gameLoop() {
+    const ctx = gameCanvas.getContext('2d');
+
+    // 0: Display UI
+    displayGameUI(ctx);
+
     // 1: Generate vector field equation
     console.time('Generating equation');
-    const equation = generateEquation();
+    if (override_equation) {
+        equation = override_equation;
+    } else {
+        equation = generateEquation();
+    }
+
     console.timeEnd('Generating equation');
 
     // 2: Display equation, and pause for 5 seconds
     console.time('Displaying equation');
-    displayEquation(equation);
+    displayEquation(ctx, equation);
     console.timeEnd('Displaying equation');
-    await sleep(5000);
+    await sleep(1);
 
     // 3: Slowly & randomly generate arrows
     console.time('Revealing arrows');
@@ -35,21 +71,65 @@ async function gameLoop() {
             remainingLocations.push({x:i, y:j});
         }
     }
-    revealArrows(equation);
-    console.timeEnd('Revealing arrows');
+    // Find largest possible arrow
+    let all_arrows = [];
     
-    // 4: Once player has placed down their line, speed up arrow generation
-    while (!player_done) {
-        await sleep(10);
+    for (let i = 0; i < remainingLocations.length; i++) {
+        all_arrows.push(generateArrow(equation, 0, remainingLocations[i]).magnitude);
     }
 
-    console.time('Revealing all arrows');
-    revealArrows(equation, 100);
-    console.timeEnd('Revealing all arrows');
+    max_magnitude = Math.max(...all_arrows);
+
+    revealArrows(ctx, equation, max_magnitude);
+    console.timeEnd('Revealing arrows');
 
     // 5: Total up score
     // 6: Start over!
 
+}
+
+function displayGameUI(ctx) {
+    ctx.save();
+
+    // Background
+    ctx.fillStyle = colors.background;
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+    // Draw grid
+    ctx.strokeStyle = colors.black;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    
+    for (let i = 0; i <= arrowGridSize; i++) {
+        ctx.moveTo(CANVAS_X_OFFSET + i * CANVAS_GAME_SIZE / arrowGridSize, CANVAS_Y_OFFSET);
+        ctx.lineTo(CANVAS_X_OFFSET + i * CANVAS_GAME_SIZE / arrowGridSize, CANVAS_Y_OFFSET + CANVAS_GAME_SIZE);
+    }
+
+    for (let i = 0; i <= arrowGridSize; i++) {
+        ctx.moveTo(CANVAS_X_OFFSET, CANVAS_Y_OFFSET + i * CANVAS_GAME_SIZE / arrowGridSize);
+        ctx.lineTo(CANVAS_X_OFFSET + CANVAS_GAME_SIZE, CANVAS_Y_OFFSET + i * CANVAS_GAME_SIZE / arrowGridSize);
+    }
+
+
+    ctx.stroke();
+
+    // Draw axis
+    ctx.strokeStyle = colors.theme;
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    // Account for offset
+    ctx.moveTo(CANVAS_X_OFFSET + CANVAS_GAME_SIZE/2, CANVAS_Y_OFFSET);
+    ctx.lineTo(CANVAS_X_OFFSET + CANVAS_GAME_SIZE/2, CANVAS_Y_OFFSET + CANVAS_GAME_SIZE);
+
+    ctx.moveTo(CANVAS_X_OFFSET, CANVAS_Y_OFFSET + CANVAS_GAME_SIZE/2);
+    ctx.lineTo(CANVAS_X_OFFSET + CANVAS_GAME_SIZE, CANVAS_Y_OFFSET + CANVAS_GAME_SIZE/2);
+
+    ctx.stroke();
+
+    
+
+
+    ctx.restore();
 }
 
 function generateEquation() {
@@ -91,9 +171,7 @@ function generateEquation() {
     
 }
 
-function displayEquation(equation) {
-    const ctx = gameCanvas.getContext('2d');
-
+function displayEquation(ctx, equation) {
     ctx.save()
     ctx.fillStyle = '#eeeeee'
 
@@ -103,12 +181,12 @@ function displayEquation(equation) {
     ctx.textBaseline = 'alphabetic'
 
     // X = previous X position + width + 25px margin
-    ctx.fillText(`F = 〈${equation.i}, ${equation.j}〉`, 50, 250)
+    ctx.fillText(`F = 〈${equation.i}, ${equation.j}〉`, 20, 30)
 
     ctx.restore();
 }
 
-async function revealArrows(equation, speed=1) {
+async function revealArrows(ctx, equation, max_magnitude, speed=1) {
     let arrowSpeed = speed;
 
     while (remainingLocations.length > 0) {
@@ -116,57 +194,293 @@ async function revealArrows(equation, speed=1) {
         const randomIndex = Math.floor(Math.random() * remainingLocations.length);
         const randomLocation = remainingLocations.splice(randomIndex, 1)[0];
 
-        console.log(randomLocation);
         const arrow = generateArrow(equation, arrowSpeed, randomLocation);
-        displayArrow(arrow);
-        await sleep(100);
+        displayArrow(ctx, arrow, max_magnitude);
+        await sleep(Math.max(1000 - (arrowSpeed * 100), 10));
 
         if (player_done) {
             return;
         }
 
-        arrowSpeed += 0.1;
+        arrowSpeed *= 1.1;
     }
 }
 
 function generateArrow(equation, speed, location) {
-    const x = equation.i.replaceAll('x', `(${location.x - 5})`).replaceAll('y', `(${location.y - 5})`);
-    const y = equation.j.replaceAll('x', `(${location.x - 5})`).replaceAll('y', `(${location.y - 5})`);
+    // Convert between 0-10 and -5 to 5
+    const x_rep = ((location.x / arrowGridSize) * 10) - 5;
+    const y_rep = -(((location.y / arrowGridSize) * 10) - 5);
+    
+    const x = equation.i.replaceAll('x', `(${x_rep})`).replaceAll('y', `(${y_rep})`);
+    const y = equation.j.replaceAll('x', `(${x_rep})`).replaceAll('y', `(${y_rep})`);
 
-    console.log(`Generating arrow: {${x} | ${y}}`);
+    let normalized = normalizeVector(math.evaluate(x), math.evaluate(y));
 
     const arrow = {
-        x: math.evaluate(x) * .4,
-        y: math.evaluate(y) * .4,
+        x: normalized.x,
+        y: normalized.y,
         speed: speed,
         location: location,
+        magnitude: normalized.magnitude,
     };
 
     return arrow;
 }
 
-function displayArrow(arrow) {
-    const ctx = gameCanvas.getContext('2d');
+function normalizeVector(x, y) {
+    if (x === 0 && y === 0) {
+        return {
+            x: 0,
+            y: 0,
+            magnitude: 0,
+        };
+    }
+    
+    let magnitude = Math.sqrt(x**2 + y**2);
 
-    ctx.save()
+    if (magnitude < 0) {
+        magnitude = 0;
+    }
 
-    ctx.translate(50 + arrow.location.x * 50, 250 + arrow.location.y * 50);
-    ctx.rotate(arrow.x);
+    let new_x = x / magnitude;
+    let new_y = y / magnitude;
+    return {
+        x: new_x,
+        y: new_y,
+        magnitude: magnitude,
+    };
+}
 
-    ctx.fillStyle = '#ff0000';
-    ctx.fillRect(-5, -5, 10, 10);
+function displayArrow(ctx, arrow, max_magnitude) {
+    const size = Math.max(Math.abs(arrow.magnitude/max_magnitude), .1);
+    // Convert from -5 to 5 to pixel on canvas
+    const start = gridToPixel(arrow.location.x, arrow.location.y);
+    const end = gridToPixel(arrow.location.x + (size * arrow.x), arrow.location.y - (size * arrow.y));
+
+    ctx.save()   
+
+    drawArrowhead(ctx, start, end, 5);
 
     ctx.restore();
 }
 
+function gridToPixel(x, y) {
+    return {
+        x: x * (CANVAS_GAME_SIZE / arrowGridSize) + CANVAS_X_OFFSET,
+        y: y * (CANVAS_GAME_SIZE / arrowGridSize) + CANVAS_Y_OFFSET,
+    }   
+}
+
+function drawArrowhead(ctx, from, to, radius) {
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = colors.highlight;
+    ctx.fillStyle = colors.highlight; // for the triangle fill
+    ctx.lineJoin = 'butt';
+
+	var x_center = to.x;
+	var y_center = to.y;
+
+	var angle;
+	var x;
+	var y;
+
+	ctx.beginPath();
+
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(to.x, to.y);
+
+    ctx.stroke();
+
+    ctx.beginPath();
+
+	angle = Math.atan2(to.y - from.y, to.x - from.x)
+	x = radius * Math.cos(angle) + x_center;
+	y = radius * Math.sin(angle) + y_center;
+
+	ctx.moveTo(x, y);
+
+	angle += (1.0/3.0) * (2 * Math.PI)
+	x = radius * Math.cos(angle) + x_center;
+	y = radius * Math.sin(angle) + y_center;
+
+	ctx.lineTo(x, y);
+
+	angle += (1.0/3.0) * (2 * Math.PI)
+	x = radius *Math.cos(angle) + x_center;
+	y = radius *Math.sin(angle) + y_center;
+
+	ctx.lineTo(x, y);
+
+	ctx.closePath();
+
+	ctx.fill();
+}
 
 async function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-function init() {
-    gameLoop();
+function getMousePos(canvas, evt) {
+    var rect = canvas.getBoundingClientRect();
+    return {
+      x: evt.clientX - rect.left,
+      y: evt.clientY - rect.top
+    };
 }
 
+gameCanvas.addEventListener('click', function(event) { 
+    if (!started_game) {
+        started_game = true;
+        let audio = document.getElementById("audio");
+        audio.volume = 0.2;
+        audio.play();
+        gameLoop();
 
-document.addEventListener('DOMContentLoaded', init)
+    } else {
+        if (!has_answered) {
+            has_answered = true;
+        } else {
+            return
+        }
+        var mousePos = getMousePos(gameCanvas, event);
+        var message = 'Mouse position: ' + mousePos.x + ',' + mousePos.y;
+        console.log(message);
+        
+        let grid_x;
+        if (mousePos.x < CANVAS_X_OFFSET) {
+            grid_x = -1;
+        } else if (mousePos.x > CANVAS_X_OFFSET + CANVAS_GAME_SIZE) {
+            grid_x = -1;
+        } else {
+            grid_x = Math.floor((mousePos.x - CANVAS_X_OFFSET) / (CANVAS_GAME_SIZE / arrowGridSize));
+        }
+    
+        let grid_y;
+        if (mousePos.y < CANVAS_Y_OFFSET) {
+            grid_y = -1;
+        } else if (mousePos.y > CANVAS_Y_OFFSET + CANVAS_GAME_SIZE) {
+            grid_y = -1;
+        } else {
+            grid_y = Math.floor((mousePos.y - CANVAS_Y_OFFSET) / (CANVAS_GAME_SIZE / arrowGridSize));
+        }
+    
+        console.log(`Grid position: ${grid_x}, ${grid_y}`);
+    
+        submitAnswer(grid_x, grid_y);
+    }
+}, false);
+
+
+function submitAnswer(x, y) {
+    if (x === -1 || y === -1) {
+        return;
+    }
+
+    player_done = true;
+
+    let ctx = gameCanvas.getContext('2d');
+
+    drawAnswer(ctx, x, y);
+
+    console.time('Revealing all arrows');
+    player_done = false;
+    revealArrows(ctx, equation, max_magnitude, speed=10000);
+    console.timeEnd('Revealing all arrows');
+
+    const score = calculateScore(equation, x, y);
+    displayScore(ctx, score);
+}
+
+function calculateScore(equation, x, y, time_taken) {
+    let x_bound_lower = x - 5;
+    let x_bound_upper = x_bound_lower + 1;
+
+    let y_bound_upper = 5 - y;
+    let y_bound_lower = y_bound_upper - 1;
+
+    let samples = 10000;
+    let score = 0;
+    for (let i = 0; i < samples; i++) {
+        let x_sample = Math.floor(Math.random() * x_bound_upper) + x_bound_lower;
+        let y_sample = Math.floor(Math.random() * y_bound_upper) + y_bound_lower;
+
+        let arrow = generateArrow(equation, 1, {x: x_sample, y: y_sample});
+        if (`{arrow.magnitude}` != "NaN") {
+            score += arrow.magnitude;
+        }
+    }
+
+    score = score/max_magnitude * (1 - (time_taken/10000));
+
+    console.log(`Score: ${score}`);
+
+    return score;
+}
+
+function drawAnswer(ctx, x, y) {
+    ctx.save();
+    ctx.fillStyle = colors.theme;
+    ctx.fillRect(x * (CANVAS_GAME_SIZE / arrowGridSize) + CANVAS_X_OFFSET, y * (CANVAS_GAME_SIZE / arrowGridSize) + CANVAS_Y_OFFSET, CANVAS_GAME_SIZE / arrowGridSize, CANVAS_GAME_SIZE / arrowGridSize);
+    ctx.restore();
+}
+
+async function displayScore(ctx, score) {
+    ctx.save();
+    ctx.fillStyle = '#eeeeee';
+
+    ctx.font = '30px Monospace';
+    ctx.fillText(`Score:`, 20, 70);
+    ctx.restore();
+
+    for (let i = 0; i < score; i+= 200) {
+        ctx.save();
+        ctx.fillStyle = colors.background;
+        ctx.fillRect(20, 80, 150, 130);
+        ctx.restore();
+
+        ctx.save();
+        ctx.fillStyle = '#eeeeee';
+        ctx.font = '30px Monospace';
+        ctx.fillText(i, 20, 120);
+        ctx.restore();
+        await sleep(1);
+    }
+
+    ctx.save();
+    ctx.fillStyle = colors.background;
+    ctx.fillRect(20, 80, 150, 130);
+    ctx.restore();
+
+    ctx.save();
+    ctx.fillStyle = '#eeeeee';
+    ctx.font = '30px Monospace';
+    ctx.fillText(Math.floor(score), 20, 120);
+    ctx.restore();
+}
+
+function displayStartUI(ctx) {
+    ctx.save();
+    ctx.fillStyle = colors.white;
+
+    // text specific styles
+    ctx.font = 'bold 30px Monospace'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'alphabetic'
+    
+    // Center text
+    ctx.fillText(`Welcome to OMEGA FLUX`, CANVAS_X_OFFSET + CANVAS_GAME_SIZE / 2, CANVAS_Y_OFFSET + CANVAS_GAME_SIZE / 2 - 100);
+    ctx.font = 'bold 16px Monospace'
+    ctx.fillText(`Maximize total FLUX through the provided vector field by selecting a square`, CANVAS_X_OFFSET + CANVAS_GAME_SIZE / 2, CANVAS_Y_OFFSET + CANVAS_GAME_SIZE / 2);
+    ctx.fillText(`The quicker you choose, the higher your SCORE will be`, CANVAS_X_OFFSET + CANVAS_GAME_SIZE / 2, CANVAS_Y_OFFSET + CANVAS_GAME_SIZE / 2 + 50);
+    
+    ctx.fillText(`- Click anywhere to start -`, CANVAS_X_OFFSET + CANVAS_GAME_SIZE / 2, CANVAS_Y_OFFSET + CANVAS_GAME_SIZE / 2 + 100);
+
+    ctx.restore();
+}
+
+function start() {
+    let ctx = gameCanvas.getContext('2d');
+    displayStartUI(ctx);
+}
+
+start();
