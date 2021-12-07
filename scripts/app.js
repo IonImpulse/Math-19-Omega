@@ -8,9 +8,16 @@ const CANVAS_GAME_SIZE = 600;
 const CANVAS_X_OFFSET = (CANVAS_WIDTH - CANVAS_GAME_SIZE) / 2;
 const CANVAS_Y_OFFSET = (CANVAS_HEIGHT - CANVAS_GAME_SIZE) / 2;
 
-var started_game = false;
-var player_done = false;
-var has_answered = false;
+var stop_arrow_gen = false;
+
+/*
+0 - Start screen
+1 - Game screen
+2 - Score animation screen
+3 - Game over screen
+*/
+var game_state = 0;
+
 var remainingLocations = [];
 var override_equation = {
     i: "sin(x)",
@@ -140,6 +147,10 @@ function generateEquation() {
         '?x^? - ?y^?',
         'cos(?x)^?',
         'sin(?y)^?',
+        '?x^? + ?',
+        '?y^? + ?',
+        'cos(?x)^? + ?',
+        'sin(?y)^? + ?',
     ]
 
     const randomIndex_i = Math.floor(Math.random() * template_equations.length);
@@ -176,7 +187,7 @@ function displayEquation(ctx, equation) {
     ctx.fillStyle = '#eeeeee'
 
     // text specific styles
-    ctx.font = 'bold 16px Monospace'
+    ctx.font = 'bold 16px IBM Plex Mono'
     ctx.textAlign = 'left'
     ctx.textBaseline = 'alphabetic'
 
@@ -198,7 +209,7 @@ async function revealArrows(ctx, equation, max_magnitude, speed=1) {
         displayArrow(ctx, arrow, max_magnitude);
         await sleep(Math.max(1000 - (arrowSpeed * 100), 10));
 
-        if (player_done) {
+        if (stop_arrow_gen) {
             return;
         }
 
@@ -329,19 +340,13 @@ function getMousePos(canvas, evt) {
 }
 
 gameCanvas.addEventListener('click', function(event) { 
-    if (!started_game) {
-        started_game = true;
+    if (game_state == 0) {
+        game_state = 1;
         let audio = document.getElementById("audio");
         audio.volume = 0.2;
         audio.play();
         gameLoop();
-
-    } else {
-        if (!has_answered) {
-            has_answered = true;
-        } else {
-            return
-        }
+    } else if (game_state == 1) {
         var mousePos = getMousePos(gameCanvas, event);
         var message = 'Mouse position: ' + mousePos.x + ',' + mousePos.y;
         console.log(message);
@@ -363,10 +368,21 @@ gameCanvas.addEventListener('click', function(event) {
         } else {
             grid_y = Math.floor((mousePos.y - CANVAS_Y_OFFSET) / (CANVAS_GAME_SIZE / arrowGridSize));
         }
-    
+
+        if (grid_x != -1 && grid_y != -1) {
+            game_state = 2;
+            submitAnswer(grid_x, grid_y);
+        }
+
         console.log(`Grid position: ${grid_x}, ${grid_y}`);
-    
-        submitAnswer(grid_x, grid_y);
+
+    } else if (game_state == 2) {
+        game_state = 3;
+    } else if (game_state == 3) {
+        game_state = 1;
+        gameLoop();
+    } else {
+        return;
     }
 }, false);
 
@@ -376,14 +392,14 @@ function submitAnswer(x, y) {
         return;
     }
 
-    player_done = true;
+    stop_arrow_gen = true;
 
     let ctx = gameCanvas.getContext('2d');
 
     drawAnswer(ctx, x, y);
 
     console.time('Revealing all arrows');
-    player_done = false;
+    stop_arrow_gen = false;
     revealArrows(ctx, equation, max_magnitude, speed=10000);
     console.timeEnd('Revealing all arrows');
 
@@ -391,18 +407,17 @@ function submitAnswer(x, y) {
     displayScore(ctx, score);
 }
 
-function calculateScore(equation, x, y, time_taken) {
+function calculateScore(equation, x, y) {
     let x_bound_lower = x - 5;
-    let x_bound_upper = x_bound_lower + 1;
 
     let y_bound_upper = 5 - y;
     let y_bound_lower = y_bound_upper - 1;
 
-    let samples = 10000;
+    let samples = 1000;
     let score = 0;
     for (let i = 0; i < samples; i++) {
-        let x_sample = Math.floor(Math.random() * x_bound_upper) + x_bound_lower;
-        let y_sample = Math.floor(Math.random() * y_bound_upper) + y_bound_lower;
+        let x_sample = Math.floor(Math.random() * x_bound_lower)
+        let y_sample = Math.floor(Math.random() * y_bound_lower);
 
         let arrow = generateArrow(equation, 1, {x: x_sample, y: y_sample});
         if (`{arrow.magnitude}` != "NaN") {
@@ -410,7 +425,7 @@ function calculateScore(equation, x, y, time_taken) {
         }
     }
 
-    score = score/max_magnitude * (1 - (time_taken/10000));
+    score = 10 * score/max_magnitude // * (1 - (time_taken/10000));
 
     console.log(`Score: ${score}`);
 
@@ -428,48 +443,55 @@ async function displayScore(ctx, score) {
     ctx.save();
     ctx.fillStyle = '#eeeeee';
 
-    ctx.font = '30px Monospace';
-    ctx.fillText(`Score:`, 20, 70);
+    ctx.font = '28px IBM Plex Mono';
+    ctx.fillText(`Score:`, 20, 90);
     ctx.restore();
 
     for (let i = 0; i < score; i+= 200) {
         ctx.save();
         ctx.fillStyle = colors.background;
-        ctx.fillRect(20, 80, 150, 130);
+        ctx.fillRect(20, 100, 150, 150);
         ctx.restore();
 
         ctx.save();
         ctx.fillStyle = '#eeeeee';
-        ctx.font = '30px Monospace';
+        ctx.font = '24px IBM Plex Mono';
         ctx.fillText(i, 20, 120);
         ctx.restore();
         await sleep(1);
+        if (game_state != 2) {
+            return;
+        }
     }
 
     ctx.save();
     ctx.fillStyle = colors.background;
-    ctx.fillRect(20, 80, 150, 130);
+    ctx.fillRect(20, 100, 150, 150);
     ctx.restore();
 
     ctx.save();
     ctx.fillStyle = '#eeeeee';
-    ctx.font = '30px Monospace';
+    ctx.font = '24px IBM Plex Mono';
     ctx.fillText(Math.floor(score), 20, 120);
     ctx.restore();
+
+    game_state = 3;
+
 }
 
 function displayStartUI(ctx) {
+    game_state = 0;
     ctx.save();
     ctx.fillStyle = colors.white;
 
     // text specific styles
-    ctx.font = 'bold 30px Monospace'
+    ctx.font = 'bold 30px IBM Plex Mono'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'alphabetic'
     
     // Center text
     ctx.fillText(`Welcome to OMEGA FLUX`, CANVAS_X_OFFSET + CANVAS_GAME_SIZE / 2, CANVAS_Y_OFFSET + CANVAS_GAME_SIZE / 2 - 100);
-    ctx.font = 'bold 16px Monospace'
+    ctx.font = 'bold 16px IBM Plex Mono'
     ctx.fillText(`Maximize total FLUX through the provided vector field by selecting a square`, CANVAS_X_OFFSET + CANVAS_GAME_SIZE / 2, CANVAS_Y_OFFSET + CANVAS_GAME_SIZE / 2);
     ctx.fillText(`The quicker you choose, the higher your SCORE will be`, CANVAS_X_OFFSET + CANVAS_GAME_SIZE / 2, CANVAS_Y_OFFSET + CANVAS_GAME_SIZE / 2 + 50);
     
@@ -482,5 +504,3 @@ function start() {
     let ctx = gameCanvas.getContext('2d');
     displayStartUI(ctx);
 }
-
-start();

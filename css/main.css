@@ -27,11 +27,18 @@ h1 {
   box-shadow: 15px 15px 0px var(--main-black);
   margin: 0 auto;
   margin-top: 10px;
+  transition: all 0.5s ease;
+}
+
+h1:hover {
+    color: var(--alt-theme);
+    box-shadow: 15px 15px 0px var(--main-black);
+    cursor: pointer;
 }
 
 h3 {
   margin-top: 30px;
-  font-family: "Viga", sans-serif;
+  font-family: "IBM Plex Mono", sans-serif;
   font-size: 20px;
 }
 
@@ -50,8 +57,10 @@ h3 {
 }
 
 .highlight {
-  animation: highlight-animation 2s 4 ease-in-out;
+  animation: highlight-animation 2s 1 ease-in-out;
 }
+
+
 
 @keyframes highlight-animation {
   0% {
