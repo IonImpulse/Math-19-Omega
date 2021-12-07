@@ -463,7 +463,16 @@ async function displayScore(ctx, score) {
         ctx.restore();
         await sleep(1);
         if (game_state != 2) {
-            return;
+            ctx.save();
+            ctx.fillStyle = colors.background;
+            ctx.fillRect(20, 100, 150, 150);
+            ctx.restore();
+            ctx.save();
+            ctx.fillStyle = '#eeeeee';
+            ctx.font = '24px IBM Plex Mono';
+            ctx.fillText(Math.floor(score), 20, 120);
+            ctx.restore();
+        return
         }
     }
 
