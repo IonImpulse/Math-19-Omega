@@ -26,7 +26,9 @@ var override_equation = {
 
 var equation;
 var max_magnitude;
+var time_remaining;
 var override_equation = false;
+
 
 const colors = {
     'black': '#092327',
@@ -392,6 +394,7 @@ function submitAnswer(x, y) {
         return;
     }
 
+    time_remaining = remainingLocations.length;
     stop_arrow_gen = true;
 
     let ctx = gameCanvas.getContext('2d');
@@ -425,7 +428,7 @@ function calculateScore(equation, x, y) {
         }
     }
 
-    score = 10 * score/max_magnitude // * (1 - (time_taken/10000));
+    score = Math.log10(time_remaining) * 10 * score/max_magnitude // * (1 - (time_taken/10000));
 
     console.log(`Score: ${score}`);
 
