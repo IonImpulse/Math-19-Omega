@@ -105,7 +105,7 @@ function displayGameUI(ctx) {
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
     // Draw grid
-    ctx.strokeStyle = colors.black;
+    ctx.strokeStyle = colors.theme + "55";
     ctx.lineWidth = 1;
     ctx.beginPath();
     
@@ -446,7 +446,8 @@ async function displayScore(ctx, score) {
     ctx.save();
     ctx.fillStyle = '#eeeeee';
 
-    ctx.font = '28px IBM Plex Mono';
+    ctx.font = 'bold 24px IBM Plex Mono';
+
     ctx.fillText(`Score:`, 20, 90);
     ctx.restore();
 
@@ -485,6 +486,8 @@ async function displayScore(ctx, score) {
     ctx.fillStyle = '#eeeeee';
     ctx.font = '24px IBM Plex Mono';
     ctx.fillText(Math.floor(score), 20, 120);
+    ctx.font = 'bold 16px IBM Plex Mono';
+    ctx.fillText("Click to play again", 20, 170);
     ctx.restore();
 
     game_state = 3;
@@ -504,6 +507,7 @@ function displayStartUI(ctx) {
     // Center text
     ctx.fillText(`Welcome to OMEGA FLUX`, CANVAS_X_OFFSET + CANVAS_GAME_SIZE / 2, CANVAS_Y_OFFSET + CANVAS_GAME_SIZE / 2 - 100);
     ctx.font = 'bold 16px IBM Plex Mono'
+    ctx.fillText(`A vector field will slowly be revealed, with the equation displayed in the top-left hand corner.`, CANVAS_X_OFFSET + CANVAS_GAME_SIZE / 2, CANVAS_Y_OFFSET + CANVAS_GAME_SIZE / 2 - 50);
     ctx.fillText(`Maximize total FLUX through the provided vector field by selecting a square`, CANVAS_X_OFFSET + CANVAS_GAME_SIZE / 2, CANVAS_Y_OFFSET + CANVAS_GAME_SIZE / 2);
     ctx.fillText(`The quicker you choose, the higher your SCORE will be`, CANVAS_X_OFFSET + CANVAS_GAME_SIZE / 2, CANVAS_Y_OFFSET + CANVAS_GAME_SIZE / 2 + 50);
     
